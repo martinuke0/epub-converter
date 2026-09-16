@@ -63,3 +63,6 @@ class_name = "CalibreConverter"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["CalibreConverter"]
+
+[triggers]
+crons = ["*/10 * * * *"]

@@ -1,5 +1,7 @@
 export type PdfPageSize = 'a4' | 'letter' | 'a5' | 'legal';
 
+export type QualityPreset = 'screen' | 'print' | 'kindle';
+
 export interface ConversionOptions {
   /** PDF page size when outputting PDF */
   pdfPageSize?: PdfPageSize;
@@ -20,9 +22,11 @@ export interface ConversionOptions {
   imageQuality?: number;
   /** Engine --output-profile (e.g. kindle, tablet, default) */
   outputProfile?: string;
+  /** Quality preset shorthand */
+  preset?: QualityPreset;
 }
 
-export const DEFAULT_OPTIONS: ConversionOptions = {
+export const DEFAULT_OPTIONS: Omit<Required<ConversionOptions>, 'preset' | 'outputProfile'> = {
   pdfPageSize: 'a4',
   marginTop: 72,
   marginBottom: 72,
@@ -33,4 +37,10 @@ export const DEFAULT_OPTIONS: ConversionOptions = {
   preserveMetadata: true,
   imageDpi: 150,
   imageQuality: 85,
+};
+
+export const QUALITY_PRESETS: Record<QualityPreset, Partial<ConversionOptions>> = {
+  screen: { imageDpi: 96, imageQuality: 80, embedFonts: true },
+  print: { imageDpi: 300, imageQuality: 95, embedFonts: true },
+  kindle: { imageDpi: 167, imageQuality: 75, embedFonts: false },
 };

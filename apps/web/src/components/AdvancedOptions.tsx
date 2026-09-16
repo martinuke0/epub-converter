@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import type { ConversionOptions, PdfPageSize } from '@epub/shared';
+import { QUALITY_PRESETS } from '@epub/shared';
+import type { ConversionOptions, PdfPageSize, QualityPreset } from '@epub/shared';
 
 interface Props {
   value: ConversionOptions;
@@ -40,6 +41,28 @@ export function AdvancedOptions({ value, onChange, showPdf, disabled }: Props) {
         <div className="grid grid-cols-1 gap-4 border-t border-[var(--color-border)] px-3 py-4 sm:grid-cols-2 sm:px-4">
           {showPdf && (
             <>
+              <div className="sm:col-span-2">
+                <span className="mb-1.5 block text-sm text-[var(--color-ink-muted)]">Quality preset</span>
+                <div className="flex gap-1">
+                  {(['screen', 'print', 'kindle'] as QualityPreset[]).map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => onChange({ ...value, ...QUALITY_PRESETS[preset], preset })}
+                      className={[
+                        'rounded-md border px-3 py-1.5 text-xs font-medium capitalize transition',
+                        value.preset === preset
+                          ? 'border-brand-500 bg-brand-50 text-brand-700 ring-1 ring-brand-500/30'
+                          : 'border-[var(--color-border)] bg-[var(--color-surface-muted)] text-[var(--color-ink-muted)] hover:border-brand-400',
+                        disabled ? 'opacity-50 cursor-not-allowed' : '',
+                      ].join(' ')}
+                    >
+                      {preset.charAt(0).toUpperCase() + preset.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <label className="block text-sm">
                 <span className="mb-1 block text-[var(--color-ink-muted)]">PDF page size</span>
                 <select

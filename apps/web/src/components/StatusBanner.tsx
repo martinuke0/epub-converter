@@ -14,7 +14,7 @@ export function StatusBanner({ health, loading, error, warming }: Props) {
       <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-ink-muted)]">
         <span className="inline-flex items-center gap-2">
           <Spinner />
-          Checking converter…
+          Warming up…
         </span>
       </div>
     );
@@ -23,7 +23,7 @@ export function StatusBanner({ health, loading, error, warming }: Props) {
   if (error && !health) {
     return (
       <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-        API offline: {error}. Start with <code className="font-mono">npm run dev</code>.
+        Converter unavailable: {error}. Check back shortly.
       </div>
     );
   }
