@@ -55,7 +55,7 @@ export interface Env {
   /** Optional external Calibre URL (Compose / custom host). Unused when container binding works. */
   CONVERTER_URL?: string;
   MAX_FILE_SIZE_MB?: string;
-  /** If set, require X-Access-Token or ?token= (do not commit the value). */
+  /** If set, require X-Access-Token header (do not commit the value). */
   ACCESS_TOKEN?: string;
   RATE_LIMIT_MAX?: string;
   RATE_LIMIT_WINDOW_SEC?: string;
@@ -106,10 +106,8 @@ function clientIp(request: Request): string {
   );
 }
 
-function readAccessToken(request: Request, url: URL): string | null {
-  return (
-    request.headers.get('x-access-token') || url.searchParams.get('token') || null
-  );
+function readAccessToken(request: Request): string | null {
+  return request.headers.get('x-access-token') || null;
 }
 
 function kvAdapter(ns: KVNamespace | undefined): GuardKv | undefined {
@@ -244,7 +242,7 @@ export default {
         ip: clientIp(request),
         fileSize: file.size,
         maxFileSizeBytes: maxBytes,
-        accessToken: readAccessToken(request, url),
+        accessToken: readAccessToken(request),
         env: guardEnv(env),
         kv: kvAdapter(env.RATE_LIMIT),
       };

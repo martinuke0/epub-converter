@@ -20,9 +20,8 @@ export function clientIp(headers: Headers, fallback = '127.0.0.1'): string {
 
 export function readAccessToken(req: {
   header: (name: string) => string | undefined;
-  query: (name: string) => string | undefined;
 }): string | null {
-  return req.header('x-access-token') || req.query('token') || null;
+  return req.header('x-access-token') || null;
 }
 
 export function guardEnvFromProcess(): Record<string, string | undefined> {
