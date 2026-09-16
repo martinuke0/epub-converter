@@ -1,4 +1,6 @@
-FROM debian:bookworm-slim
+# Cloudflare Containers require linux/amd64.
+# Local Compose on Apple Silicon will emulate via QEMU when platform is set in compose.
+FROM --platform=linux/amd64 debian:bookworm-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV QTWEBENGINE_CHROMIUM_FLAGS="--no-sandbox --disable-gpu --disable-dev-shm-usage"

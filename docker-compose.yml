@@ -3,6 +3,7 @@ services:
     build:
       context: ./converter
       dockerfile: Dockerfile
+    platform: linux/amd64
     ports:
       - "8090:8090"
     environment:

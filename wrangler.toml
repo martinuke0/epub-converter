@@ -1,28 +1,46 @@
-# Cloudflare Pages + Functions / Worker configuration for Epub converter
-# Deploy: npx wrangler pages deploy apps/web/dist --project-name=epub-converter
-# Or bind a Worker for API: npx wrangler deploy
+# Epub — Cloudflare Worker + Containers + R2 + Static Assets
+# Deploy: npm run build:web && npx wrangler deploy
+# Requires Docker running locally when image= points at a Dockerfile (linux/amd64).
 
 name = "epub-converter"
-compatibility_date = "2025-01-01"
+main = "apps/api/functions/worker.ts"
+compatibility_date = "2025-09-16"
 compatibility_flags = ["nodejs_compat"]
-pages_build_output_dir = "apps/web/dist"
-
-# Production Worker entry (optional dedicated Worker)
-# main = "apps/api/functions/worker.ts"
 
 [vars]
-# Public non-secret config
 MAX_FILE_SIZE_MB = "80"
-# Set CONVERTER_URL in the Cloudflare dashboard / .dev.vars (secret-ish)
-# CONVERTER_URL = "https://your-calibre-sidecar.example.com"
+# Optional external Calibre fallback (local Compose / custom host).
+# Prefer the CALIBRE_CONVERTER container binding in production — no CONVERTER_URL needed.
+# CONVERTER_URL = "http://localhost:8090"
 
-# R2 binding for temporary uploads (production path)
-# Create bucket: npx wrangler r2 bucket create epub-converter-tmp
+# Serve the Vite build; /api/* runs the Worker first.
+[assets]
+directory = "apps/web/dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
+# R2 for temporary upload staging (Worker puts bytes, then deletes after convert).
+# Create buckets once:
+#   npx wrangler r2 bucket create epub-converter-tmp
+#   npx wrangler r2 bucket create epub-converter-tmp-preview
 [[r2_buckets]]
 binding = "UPLOADS"
 bucket_name = "epub-converter-tmp"
 preview_bucket_name = "epub-converter-tmp-preview"
 
-# Uncomment when using Pages Functions under /functions
-# [env.production]
-# vars = { MAX_FILE_SIZE_MB = "80" }
+# Cloudflare Containers — Calibre ebook-convert sidecar
+# class_name must match the exported Durable Object / Container class in worker.ts
+[[containers]]
+class_name = "CalibreConverter"
+image = "./converter/Dockerfile"
+instance_type = "standard-2"
+max_instances = 3
+
+[[durable_objects.bindings]]
+name = "CALIBRE_CONVERTER"
+class_name = "CalibreConverter"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["CalibreConverter"]
