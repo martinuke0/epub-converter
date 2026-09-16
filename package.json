@@ -1,0 +1,26 @@
+{
+  "name": "epub-converter",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Epub — Convert ebooks without the clutter.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n web,api -c cyan,magenta \"npm run dev -w @epub/web\" \"npm run dev -w @epub/api\"",
+    "dev:web": "npm run dev -w @epub/web",
+    "dev:api": "npm run dev -w @epub/api",
+    "build": "npm run build -w @epub/shared && npm run build -w @epub/web && npm run build -w @epub/api",
+    "build:web": "npm run build -w @epub/shared && npm run build -w @epub/web",
+    "start:api": "npm run start -w @epub/api",
+    "typecheck": "npm run typecheck -w @epub/shared && npm run typecheck -w @epub/web && npm run typecheck -w @epub/api"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

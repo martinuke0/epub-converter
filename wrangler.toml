@@ -1,0 +1,28 @@
+# Cloudflare Pages + Functions / Worker configuration for Epub converter
+# Deploy: npx wrangler pages deploy apps/web/dist --project-name=epub-converter
+# Or bind a Worker for API: npx wrangler deploy
+
+name = "epub-converter"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = "apps/web/dist"
+
+# Production Worker entry (optional dedicated Worker)
+# main = "apps/api/functions/worker.ts"
+
+[vars]
+# Public non-secret config
+MAX_FILE_SIZE_MB = "80"
+# Set CONVERTER_URL in the Cloudflare dashboard / .dev.vars (secret-ish)
+# CONVERTER_URL = "https://your-calibre-sidecar.example.com"
+
+# R2 binding for temporary uploads (production path)
+# Create bucket: npx wrangler r2 bucket create epub-converter-tmp
+[[r2_buckets]]
+binding = "UPLOADS"
+bucket_name = "epub-converter-tmp"
+preview_bucket_name = "epub-converter-tmp-preview"
+
+# Uncomment when using Pages Functions under /functions
+# [env.production]
+# vars = { MAX_FILE_SIZE_MB = "80" }
