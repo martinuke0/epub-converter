@@ -16,7 +16,7 @@
     "start:api": "npm run start -w @epub/api",
     "typecheck": "npm run typecheck -w @epub/shared && npm run typecheck -w @epub/web && npm run typecheck -w @epub/api",
     "deploy": "npm run build:web && wrangler deploy",
-    "deploy:worker": "wrangler deploy",
+    "deploy:worker": "npm run build:web && wrangler deploy --containers-rollout=none",
     "cf:r2:create": "wrangler r2 bucket create epub-converter-tmp && wrangler r2 bucket create epub-converter-tmp-preview"
   },
   "devDependencies": {

@@ -1,11 +1,13 @@
 # Epub — Cloudflare Worker + Containers + R2 + Static Assets
 # Deploy: npm run build:web && npx wrangler deploy
-# Requires Docker running locally when image= points at a Dockerfile (linux/amd64).
+# Workers Builds can build the container image in Cloudflare; local Docker is optional.
 
 name = "epub-converter"
 main = "apps/api/functions/worker.ts"
 compatibility_date = "2025-09-16"
 compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+# Default URL: https://epub-converter.<subdomain>.workers.dev
 
 [vars]
 MAX_FILE_SIZE_MB = "80"

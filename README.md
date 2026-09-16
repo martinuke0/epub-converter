@@ -121,15 +121,50 @@ Browser → Vite (/api proxy) → Hono API → HttpConverter → Docker Compose 
 
 ---
 
-## Cloudflare Containers deploy
+## Production deploy (recommended: Workers Builds)
 
 Production does **not** need a random external Calibre host. The Worker routes `/api/*` to a **Cloudflare Container** running the same `converter/Dockerfile`, with **R2** for optional upload staging and **Workers Static Assets** for the UI.
 
-### Prerequisites
+### Recommended: Cloudflare Workers Builds
+
+Workers Builds is the recommended production path. It builds and deploys from GitHub in Cloudflare's build environment, so Docker does **not** need to be installed or running on your laptop. Workers Builds can build the `converter/Dockerfile` referenced by `wrangler.toml`.
+
+In the Cloudflare dashboard:
+
+1. Open **Workers & Pages → epub-converter → Settings → Builds**.
+2. Connect GitHub and select `martinuke0/epub-converter`.
+3. Set the production branch to `main`.
+4. Set the build/deploy command to:
+
+   ```bash
+   npm run build:web && npx wrangler deploy
+   ```
+
+5. Save and trigger a production build.
+
+The build command creates `apps/web/dist`, then Wrangler publishes the Worker, static assets, and the Container configuration. Create the R2 buckets once before the first production conversion (see below). The public Workers Dev URL follows `https://epub-converter.<subdomain>.workers.dev`; the known live URL is https://epub-converter.rubicon.workers.dev.
+
+### Local fallback: Worker and UI only
+
+To publish the Worker and UI without rolling out the Container image, build the UI and run:
+
+```bash
+npm run build:web
+npx wrangler deploy --containers-rollout=none
+# or: npm run deploy:worker
+```
+
+This fallback is useful for checking Worker/UI changes when Docker is unavailable. Conversion routes that require Calibre will not work until a Container image is built and rolled out.
+
+### Optional: direct full Container deploy from your laptop
+
+Use this only when you specifically want to build and roll out the Container from a local machine. This path requires Docker; it is not needed for Cloudflare deploys triggered by Workers Builds.
+
+#### Prerequisites
 
 - Cloudflare account with Workers + Containers + R2 enabled
 - `npx wrangler login` (or `CLOUDFLARE_API_TOKEN`)
-- **Docker running locally** at deploy time — required when `image` in `wrangler.toml` is a Dockerfile path (Wrangler builds `linux/amd64` and pushes to the Cloudflare registry)
+- Docker running locally (Wrangler builds `linux/amd64` and pushes the image)
 - Node 22+ recommended for current Wrangler (`nvm use 22` if you use nvm)
 - On **Apple Silicon**, the amd64 container build runs under QEMU — allow extra time; see Local (Compose) Apple Silicon note above
 
@@ -165,7 +200,7 @@ What this does:
 
 ### 4. Wait for cold start / provisioning
 
-After the first deploy, wait several minutes before expecting conversions to succeed. The Worker URL may respond while Cloudflare is still provisioning containers. First requests to a sleeping container also incur a **cold start** (Calibre + Xvfb boot).
+After the first full Container deploy, wait several minutes before expecting conversions to succeed. The Worker URL may respond while Cloudflare is still provisioning containers. First requests to a sleeping container also incur a **cold start** (Calibre + Xvfb boot).
 
 Check status:
 
@@ -192,16 +227,14 @@ Config lives in `wrangler.toml`:
 
 Optional: set `CONVERTER_URL` as a Worker var only if you want an external Calibre fallback. With Containers wired, you do **not** need it.
 
-### Manual Cloudflare dashboard steps
+### Cloudflare setup checks
 
-Usually none beyond account login. Optionally:
+1. **Workers & Pages → epub-converter → Settings** — confirm the R2 `UPLOADS` binding and Container binding.
+2. **Workers & Pages → Containers** — inspect instance health, metrics, and logs.
+3. **R2** — confirm buckets `epub-converter-tmp` and `epub-converter-tmp-preview` exist.
+4. Enable a custom domain on the Worker if desired.
 
-1. **Workers & Pages → epub-converter → Settings** — confirm R2 `UPLOADS` binding and Container binding
-2. **Workers & Pages → Containers** — inspect instance health, metrics, logs
-3. **R2** — confirm buckets `epub-converter-tmp` and `epub-converter-tmp-preview` exist
-4. Enable a custom domain on the Worker if desired
-
-If Docker is unavailable on the machine running deploy, either start Docker, use Workers Builds (CI with Docker), or pre-build/push an image and point `image` at `registry.cloudflare.com/<ACCOUNT_ID>/...` instead of the Dockerfile path.
+For Git-based Cloudflare deploys, Docker is handled by Workers Builds. Only the optional direct CLI Container deploy above requires Docker locally.
 
 ### Instance sizing note
 
@@ -223,7 +256,8 @@ Calibre is memory-heavy. This repo uses `instance_type = "standard-2"` (1 vCPU /
 | `npm run dev` | UI + Hono API (expects Compose Calibre) |
 | `npm run build` | Build shared, web, api |
 | `npm run build:web` | Shared + web only |
-| `npm run deploy` | `build:web` + `wrangler deploy` (Containers) |
+| `npm run deploy` | `build:web` + `wrangler deploy` (full Containers deploy) |
+| `npm run deploy:worker` | `build:web` + Worker/UI deploy without Container rollout |
 | `docker compose up -d` | Local Calibre converter |
 
 ## License
