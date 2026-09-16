@@ -73,7 +73,9 @@ docker compose up -d --build
 # health: curl http://localhost:8090/health
 ```
 
-First build may take several minutes (Calibre image). The image is `linux/amd64` (same as Cloudflare Containers).
+First build may take several minutes (downloads the official Calibre linux binary into `/opt/calibre`). The image is `linux/amd64` (same as Cloudflare Containers).
+
+**Apple Silicon note:** Compose and Wrangler both build `linux/amd64`. On an M-series Mac that means QEMU emulation. The Dockerfile intentionally avoids Debian's `calibre` apt package (large dependency tree that often hits dpkg I/O errors under QEMU) and installs Calibre from the [official binary installer](https://calibre-ebook.com/download_linux) instead. Expect a slower first build; subsequent layers cache.
 
 ### 3. Start UI + API
 
@@ -128,7 +130,8 @@ Production does **not** need a random external Calibre host. The Worker routes `
 - Cloudflare account with Workers + Containers + R2 enabled
 - `npx wrangler login` (or `CLOUDFLARE_API_TOKEN`)
 - **Docker running locally** at deploy time — required when `image` in `wrangler.toml` is a Dockerfile path (Wrangler builds `linux/amd64` and pushes to the Cloudflare registry)
-- Node 22+ recommended for current Wrangler
+- Node 22+ recommended for current Wrangler (`nvm use 22` if you use nvm)
+- On **Apple Silicon**, the amd64 container build runs under QEMU — allow extra time; see Local (Compose) Apple Silicon note above
 
 ### 1. Create R2 buckets (once)
 

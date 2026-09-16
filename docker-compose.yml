@@ -1,3 +1,6 @@
+# Local Calibre sidecar. Image is linux/amd64 (matches Cloudflare Containers).
+# On Apple Silicon, Docker Desktop emulates via QEMU — first build is slow.
+# Dockerfile installs Calibre via the official binary (not apt `calibre`).
 services:
   converter:
     build:
