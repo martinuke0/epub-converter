@@ -1,5 +1,4 @@
 import type { Converter, ConvertRequest, ConvertResult, ConverterHealth } from './types.js';
-import { EXT, MIME } from './types.js';
 
 /**
  * Development fallback when Calibre sidecar is offline.

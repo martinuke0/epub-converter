@@ -20,7 +20,7 @@ export function AdvancedOptions({ value, onChange, showPdf, disabled }: Props) {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between px-4 py-3 text-left"
+        className="flex w-full items-center justify-between px-3 py-3 text-left sm:px-4"
         aria-expanded={open}
       >
         <span className="text-sm font-semibold text-[var(--color-ink)]">Advanced options</span>
@@ -37,7 +37,7 @@ export function AdvancedOptions({ value, onChange, showPdf, disabled }: Props) {
         </svg>
       </button>
       {open && (
-        <div className="grid gap-4 border-t border-[var(--color-border)] px-4 py-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 border-t border-[var(--color-border)] px-3 py-4 sm:grid-cols-2 sm:px-4">
           {showPdf && (
             <>
               <label className="block text-sm">
@@ -64,7 +64,9 @@ export function AdvancedOptions({ value, onChange, showPdf, disabled }: Props) {
                   ] as const
                 ).map(([key, label]) => (
                   <label key={key} className="block text-sm">
-                    <span className="mb-1 block text-[var(--color-ink-muted)]">Margin {label} (pt)</span>
+                    <span className="mb-1 block text-[var(--color-ink-muted)]">
+                      Margin {label} (pt)
+                    </span>
                     <input
                       type="number"
                       min={0}

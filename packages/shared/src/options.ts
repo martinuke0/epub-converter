@@ -14,13 +14,15 @@ export interface ConversionOptions {
   toc?: boolean;
   /** Preserve source metadata */
   preserveMetadata?: boolean;
-  /** Image DPI for rasterization */
+  /** Image DPI for rasterization (UI / presets; best-effort with engine) */
   imageDpi?: number;
-  /** Image quality 0–100 */
+  /** Image quality 0–100 → engine --jpegquality */
   imageQuality?: number;
+  /** Engine --output-profile (e.g. kindle, tablet, default) */
+  outputProfile?: string;
 }
 
-export const DEFAULT_OPTIONS: Required<ConversionOptions> = {
+export const DEFAULT_OPTIONS: ConversionOptions = {
   pdfPageSize: 'a4',
   marginTop: 72,
   marginBottom: 72,

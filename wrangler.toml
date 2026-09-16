@@ -11,6 +11,13 @@ workers_dev = true
 
 [vars]
 MAX_FILE_SIZE_MB = "80"
+RATE_LIMIT_MAX = "10"
+RATE_LIMIT_WINDOW_SEC = "60"
+MAX_CONCURRENT_PER_IP = "2"
+MAX_CONCURRENT_GLOBAL = "5"
+# Optional private mode — set as a secret, do not commit:
+#   npx wrangler secret put ACCESS_TOKEN
+# ACCESS_TOKEN is read from env/secrets when set; GuardPlugin requires X-Access-Token or ?token=
 # Optional external Calibre fallback (local Compose / custom host).
 # Prefer the CALIBRE_CONVERTER container binding in production — no CONVERTER_URL needed.
 # CONVERTER_URL = "http://localhost:8090"
@@ -30,6 +37,16 @@ run_worker_first = ["/api/*"]
 binding = "UPLOADS"
 bucket_name = "epub-converter-tmp"
 preview_bucket_name = "epub-converter-tmp-preview"
+
+# Workers KV for rate-limit + concurrency counters (required for multi-isolate abuse protection).
+# Create once:
+#   npx wrangler kv namespace create RATE_LIMIT
+#   npx wrangler kv namespace create RATE_LIMIT --preview
+# Then paste the ids below (id / preview_id).
+[[kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "00000000000000000000000000000000"
+preview_id = "00000000000000000000000000000000"
 
 # Cloudflare Containers — Calibre ebook-convert sidecar
 # class_name must match the exported Durable Object / Container class in worker.ts

@@ -7,6 +7,7 @@ import {
   detectFormat,
   getCapabilities,
   isConversionSupported,
+  listUiPresets,
   type ConversionOptions,
   type FormatId,
 } from '@epub/shared';
@@ -15,6 +16,13 @@ import {
   createStub,
   type Converter,
 } from '../converters/index.js';
+import {
+  buildGuardContext,
+  clientIp,
+  enforceGuards,
+  readAccessToken,
+  releaseGuards,
+} from '../middleware/guards.js';
 import { deleteResult, getResult, storeResult } from '../storage/temp.js';
 
 const allowStub = process.env.ALLOW_STUB === 'true';
@@ -41,6 +49,7 @@ convertRoutes.get('/health', async (c) => {
     converter: health,
     maxFileSizeMb: MAX_FILE_SIZE_MB,
     stubAllowed: allowStub,
+    warming: !health.ok,
   });
 });
 
@@ -48,6 +57,19 @@ convertRoutes.get('/formats', (c) => {
   return c.json({
     formats: FORMATS,
     maxFileSizeMb: MAX_FILE_SIZE_MB,
+  });
+});
+
+convertRoutes.get('/presets', (c) => {
+  return c.json({
+    presets: listUiPresets().map((p) => ({
+      id: p.id,
+      label: p.label,
+      description: p.description,
+      appliesTo: p.appliesTo,
+      options: p.options,
+      ui: p.ui,
+    })),
   });
 });
 
@@ -75,11 +97,27 @@ convertRoutes.post('/convert', async (c) => {
     return c.json({ error: 'Missing file field' }, 400);
   }
 
-  if (file.size > MAX_FILE_SIZE_BYTES) {
-    return c.json({ error: `File exceeds ${MAX_FILE_SIZE_MB}MB limit` }, 413);
-  }
   if (file.size === 0) {
     return c.json({ error: 'Empty file' }, 400);
+  }
+
+  const guardCtx = buildGuardContext({
+    ip: clientIp(c.req.raw.headers),
+    fileSize: file.size,
+    accessToken: readAccessToken({
+      header: (n) => c.req.header(n),
+      query: (n) => c.req.query(n),
+    }),
+    maxFileSizeBytes: MAX_FILE_SIZE_BYTES,
+  });
+
+  const gated = await enforceGuards(guardCtx);
+  if (!gated.ok) {
+    const headers: Record<string, string> = {};
+    if (gated.body.retryAfterSec != null) {
+      headers['Retry-After'] = String(gated.body.retryAfterSec);
+    }
+    return c.json(gated.body, gated.status, headers);
   }
 
   const toRaw = String(body.get('to') || '').toLowerCase() as FormatId;
@@ -88,14 +126,17 @@ convertRoutes.post('/convert', async (c) => {
   const from = (fromRaw && FORMATS[fromRaw as FormatId] ? fromRaw : detected) as FormatId | null;
 
   if (!from) {
+    await releaseGuards(gated.acquired, guardCtx);
     return c.json({ error: 'Could not detect input format' }, 400);
   }
   if (!FORMATS[toRaw]) {
+    await releaseGuards(gated.acquired, guardCtx);
     return c.json({ error: `Unsupported output format: ${toRaw}` }, 400);
   }
 
   const support = isConversionSupported(from, toRaw);
   if (!support.ok) {
+    await releaseGuards(gated.acquired, guardCtx);
     return c.json({ error: support.reason || 'Unsupported conversion' }, 400);
   }
 
@@ -105,6 +146,7 @@ convertRoutes.post('/convert', async (c) => {
     try {
       options = { ...DEFAULT_OPTIONS, ...JSON.parse(optsRaw) };
     } catch {
+      await releaseGuards(gated.acquired, guardCtx);
       return c.json({ error: 'Invalid options JSON' }, 400);
     }
   }
@@ -116,10 +158,12 @@ convertRoutes.post('/convert', async (c) => {
     converter = resolved.converter;
     stubbed = resolved.stubbed;
   } catch (e) {
+    await releaseGuards(gated.acquired, guardCtx);
     return c.json(
       {
         error: e instanceof Error ? e.message : 'Converter unavailable',
         hint: 'docker compose up -d',
+        code: 'converter_unavailable',
       },
       503
     );
@@ -136,10 +180,8 @@ convertRoutes.post('/convert', async (c) => {
       options,
     });
 
-    // Store for optional delayed download, also return immediately
     const stored = await storeResult(result.buffer, result.filename, result.mimeType);
 
-    // If client wants JSON+download URL (batch UI), honor ?mode=json
     if (c.req.query('mode') === 'json') {
       return c.json({
         jobId: stored.id,
@@ -167,6 +209,8 @@ convertRoutes.post('/convert', async (c) => {
       },
       500
     );
+  } finally {
+    await releaseGuards(gated.acquired, guardCtx);
   }
 });
 
@@ -177,10 +221,8 @@ convertRoutes.get('/download/:id', async (c) => {
     return c.json({ error: 'File expired or not found' }, 404);
   }
   const { job, buffer } = result;
-  // Delete after download (one-shot)
   const once = c.req.query('once') !== '0';
   if (once) {
-    // Delay delete slightly so response can stream
     setTimeout(() => {
       void deleteResult(id);
     }, 1000);

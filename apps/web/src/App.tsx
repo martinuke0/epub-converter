@@ -1,24 +1,26 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   DEFAULT_OPTIONS,
+  applyPreset,
   detectFormat,
   getCapabilities,
   getDefaultOutput,
   type ConversionOptions,
   type FormatId,
+  type PresetPlugin,
 } from '@epub/shared';
 import { AdvancedOptions } from './components/AdvancedOptions';
 import { DropZone } from './components/DropZone';
 import { FileQueue, type QueueItem } from './components/FileQueue';
 import { FormatPicker } from './components/FormatPicker';
+import { PresetPicker } from './components/PresetPicker';
 import { StatusBanner } from './components/StatusBanner';
-import { ThemeToggle } from './components/ThemeToggle';
-import { useTheme } from './hooks/useTheme';
 import {
   convertFile,
   downloadBlob,
   fetchHealth,
   type Capability,
+  type ConvertStage,
   type HealthResponse,
 } from './lib/api';
 
@@ -28,14 +30,22 @@ function uid() {
   return crypto.randomUUID();
 }
 
+function readAccessToken(): string | null {
+  try {
+    return sessionStorage.getItem('epub-access-token');
+  } catch {
+    return null;
+  }
+}
+
 export default function App() {
-  const { theme, toggle } = useTheme();
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [healthLoading, setHealthLoading] = useState(true);
   const [healthError, setHealthError] = useState<string | null>(null);
   const [items, setItems] = useState<QueueItem[]>([]);
   const [globalTo, setGlobalTo] = useState<FormatId>('pdf');
   const [options, setOptions] = useState<ConversionOptions>({ ...DEFAULT_OPTIONS });
+  const [presetId, setPresetId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const results = useRef(new Map<string, ResultBlob>());
 
@@ -55,9 +65,12 @@ export default function App() {
 
   useEffect(() => {
     void refreshHealth();
-    const t = setInterval(() => void refreshHealth(), 30_000);
+    const t = setInterval(() => void refreshHealth(), 15_000);
     return () => clearInterval(t);
   }, [refreshHealth]);
+
+  const converterWarm = Boolean(health?.converter.ok);
+  const warming = Boolean(health && !health.converter.ok) || Boolean(health?.warming);
 
   const primaryFrom: FormatId | null = items[0]?.from ?? null;
 
@@ -115,31 +128,61 @@ export default function App() {
     );
   };
 
+  const onPresetSelect = (preset: PresetPlugin) => {
+    setPresetId(preset.id);
+    setOptions(applyPreset(preset.id, { ...DEFAULT_OPTIONS }));
+  };
+
+  const onPresetClear = () => {
+    setPresetId(null);
+    setOptions({ ...DEFAULT_OPTIONS });
+  };
+
+  const patchOptions = (next: ConversionOptions) => {
+    setOptions(next);
+    // User tweaked — keep preset id as “base” but that’s fine; still selected.
+  };
+
   const runConvert = async () => {
     const pending = items.filter((i) => i.status === 'queued' || i.status === 'error');
     if (!pending.length) return;
     setBusy(true);
 
+    const accessToken = readAccessToken();
+    const needWarm = !converterWarm;
+
     for (const item of pending) {
       setItems((prev) =>
         prev.map((x) =>
           x.id === item.id
-            ? { ...x, status: 'converting', progress: 5, error: undefined }
+            ? {
+                ...x,
+                status: 'converting',
+                progress: 2,
+                stage: (needWarm ? 'checking' : 'uploading') as ConvertStage,
+                error: undefined,
+              }
             : x
         )
       );
       try {
-        const result = await convertFile(
-          item.file,
-          item.to,
-          item.from,
-          options,
-          (pct) => {
+        const result = await convertFile(item.file, item.to, item.from, options, {
+          accessToken,
+          waitForWarm: needWarm,
+          onProgress: (pct) => {
             setItems((prev) =>
               prev.map((x) => (x.id === item.id ? { ...x, progress: pct } : x))
             );
-          }
-        );
+          },
+          onStage: (stage) => {
+            setItems((prev) =>
+              prev.map((x) => (x.id === item.id ? { ...x, stage } : x))
+            );
+            if (stage === 'warming' || stage === 'checking') {
+              void refreshHealth();
+            }
+          },
+        });
         results.current.set(item.id, { blob: result.blob, filename: result.filename });
         setItems((prev) =>
           prev.map((x) =>
@@ -148,6 +191,7 @@ export default function App() {
                   ...x,
                   status: 'done',
                   progress: 100,
+                  stage: 'done',
                   stubbed: result.stubbed,
                   resultName: result.filename,
                 }
@@ -163,6 +207,7 @@ export default function App() {
                   ...x,
                   status: 'error',
                   progress: 0,
+                  stage: 'error',
                   error: e instanceof Error ? e.message : 'Failed',
                 }
               : x
@@ -176,34 +221,39 @@ export default function App() {
   };
 
   const empty = items.length === 0;
+  const convertDisabled =
+    busy ||
+    !items.some((i) => i.status === 'queued' || i.status === 'error');
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-3xl flex-col px-4 py-8 sm:py-12">
-      <header className="mb-8 flex items-start justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-700 text-sm font-bold text-white">
-              E
-            </div>
-            <h1 className="text-2xl font-semibold tracking-tight text-[var(--color-ink)]">Epub</h1>
+    <div className="mx-auto flex min-h-dvh max-w-3xl flex-col px-3 py-6 sm:px-4 sm:py-12">
+      <header className="mb-6 sm:mb-8">
+        <div className="flex items-center gap-2">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-700 text-sm font-bold text-white">
+            E
           </div>
-          <p className="mt-2 max-w-md text-balance text-[var(--color-ink-muted)]">
-            Convert ebooks without the clutter.
-          </p>
+          <h1 className="text-2xl font-semibold tracking-tight text-[var(--color-ink)]">Epub</h1>
         </div>
-        <ThemeToggle theme={theme} onToggle={toggle} />
+        <p className="mt-2 max-w-md text-balance text-[var(--color-ink-muted)]">
+          Convert ebooks without the clutter.
+        </p>
       </header>
 
       <div className="mb-6">
-        <StatusBanner health={health} loading={healthLoading} error={healthError} />
+        <StatusBanner
+          health={health}
+          loading={healthLoading}
+          error={healthError}
+          warming={warming}
+        />
       </div>
 
-      <main className="flex flex-1 flex-col gap-6">
+      <main className="flex flex-1 flex-col gap-4 sm:gap-6">
         {empty ? (
-          <section className="rounded-3xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-sm sm:p-8">
+          <section className="rounded-3xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm sm:p-8">
             <DropZone onFiles={onFiles} />
-            <div className="mt-8 grid gap-3 text-sm text-[var(--color-ink-muted)] sm:grid-cols-3">
-              <EmptyTip title="Hero pair" body="EPUB ↔ PDF with Calibre-quality output." />
+            <div className="mt-6 grid gap-3 text-sm text-[var(--color-ink-muted)] sm:mt-8 sm:grid-cols-3">
+              <EmptyTip title="Hero pair" body="EPUB ↔ PDF with clean, readable output." />
               <EmptyTip title="Smart formats" body="Only valid targets stay enabled for your file." />
               <EmptyTip title="Private by design" body="Temp files expire; nothing is kept after download." />
             </div>
@@ -219,9 +269,17 @@ export default function App() {
               disabled={busy}
             />
 
+            <PresetPicker
+              value={presetId}
+              onSelect={onPresetSelect}
+              onClear={onPresetClear}
+              outputFormat={globalTo}
+              disabled={busy}
+            />
+
             <AdvancedOptions
               value={options}
-              onChange={setOptions}
+              onChange={patchOptions}
               showPdf={globalTo === 'pdf' || items.some((i) => i.to === 'pdf')}
               disabled={busy}
             />
@@ -243,12 +301,13 @@ export default function App() {
               }}
             />
 
-            <div className="sticky bottom-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]/95 p-3 shadow-lg backdrop-blur">
-              <p className="px-2 text-sm text-[var(--color-ink-muted)]">
+            <div className="sticky bottom-3 z-10 flex flex-col gap-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]/95 p-3 shadow-lg backdrop-blur sm:bottom-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+              <p className="px-1 text-sm text-[var(--color-ink-muted)] sm:px-2">
                 {items.filter((i) => i.status === 'queued' || i.status === 'error').length} ready ·{' '}
                 {items.filter((i) => i.status === 'done').length} done
+                {warming ? ' · converter warming' : ''}
               </p>
-              <div className="flex gap-2">
+              <div className="grid grid-cols-2 gap-2 sm:flex">
                 <button
                   type="button"
                   disabled={busy}
@@ -262,14 +321,17 @@ export default function App() {
                 </button>
                 <button
                   type="button"
-                  disabled={
-                    busy ||
-                    !items.some((i) => i.status === 'queued' || i.status === 'error')
-                  }
+                  disabled={convertDisabled}
                   onClick={() => void runConvert()}
                   className="rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 disabled:opacity-50"
                 >
-                  {busy ? 'Converting…' : 'Convert & download'}
+                  {busy
+                    ? warming
+                      ? 'Warming…'
+                      : 'Converting…'
+                    : warming
+                      ? 'Convert (will wait)'
+                      : 'Convert & download'}
                 </button>
               </div>
             </div>
@@ -277,9 +339,9 @@ export default function App() {
         )}
       </main>
 
-      <footer className="mt-10 border-t border-[var(--color-border)] pt-6 text-center text-xs text-[var(--color-ink-muted)]">
-        Files are processed via your local Calibre sidecar (or configured CONVERTER_URL). Max{' '}
-        {health?.maxFileSizeMb ?? 80}MB. Temp outputs auto-delete.
+      <footer className="mt-8 border-t border-[var(--color-border)] pt-6 text-center text-xs text-[var(--color-ink-muted)] sm:mt-10">
+        Files are processed ephemerally. Max {health?.maxFileSizeMb ?? 80}MB. Temp outputs
+        auto-delete.
       </footer>
     </div>
   );

@@ -141,6 +141,16 @@ def build_args(input_path: Path, output_path: Path, options: dict) -> list[str]:
         if options.get("embedFonts"):
             args += ["--embed-all-fonts"]
 
+    # Shared ConversionOptions → Calibre flags (presets fill these)
+    if options.get("imageQuality") is not None:
+        try:
+            args += ["--jpegquality", str(int(options["imageQuality"]))]
+        except (TypeError, ValueError):
+            pass
+    profile = options.get("outputProfile")
+    if profile:
+        args += ["--output-profile", str(profile)]
+
     return args
 
 

@@ -8,8 +8,10 @@ A calm, modern web app for converting ebooks and documents. Built with Vite + Re
 
 - Drag-and-drop multi-file queue
 - Smart format picker (only valid targets enabled)
-- Advanced options: PDF page size, margins, embed fonts, TOC, metadata, image DPI/quality
-- Dark / light theme
+- Quality presets (screen / print / kindle) + advanced options
+- Plugin architecture: formats, presets, guards (`docs/plugins.md`)
+- Rate limits & abuse protection (GuardPlugins + Workers KV)
+- Cold-start UX with honest stages (checking → warming → uploading → converting → downloading)
 - 80MB size limit; temp files deleted after TTL / download
 - Pluggable converter: local Docker Compose → Cloudflare Containers in production
 
@@ -28,7 +30,8 @@ A calm, modern web app for converting ebooks and documents. Built with Vite + Re
 | **DOCX**       | ✓    | ✓   | ✓    | ✓    | ✓   | ✓   | ✓    | ✓        | —    | ✓   |
 | **RTF**        | ✓    | ✓   | ✓    | ✓    | ✓   | ✓   | ✓    | ✓        | ✓    | —   |
 
-Same-format pairs are disabled. **Hero pair: EPUB ↔ PDF.**
+Same-format pairs are disabled. **Hero pair: EPUB ↔ PDF.**  
+A broader catalog (CBZ, ODT, KEPUB, …) is registered as coming-soon — see [docs/formats-catalog.md](docs/formats-catalog.md).
 
 Notes:
 - PDF → ebook reflow quality depends on the source PDF layout.
@@ -41,10 +44,11 @@ Notes:
 apps/web                 Vite + React + Tailwind UI
 apps/api                 Hono Node API (local `npm run dev`)
 apps/api/functions       Cloudflare Worker + Calibre Container class
-packages/shared          Format matrix, options, limits
+packages/shared          Format matrix, options, plugin registries
+docs/                    Plugins, formats catalog, high-performance notes
 converter/               Calibre HTTP sidecar (Flask + ebook-convert)
 docker-compose.yml       Local Calibre (unchanged for npm run dev)
-wrangler.toml            Worker + Containers + R2 + static assets
+wrangler.toml            Worker + Containers + R2 + KV + static assets
 ```
 
 ---
@@ -100,6 +104,11 @@ Copy `.env.example` if needed:
 | `MAX_FILE_SIZE_MB` | `80` | Upload limit |
 | `TEMP_TTL_SECONDS` | `3600` | Temp file lifetime |
 | `ALLOW_STUB` | unset | If `true`, API returns labeled stub text when Calibre is down (dev only) |
+| `RATE_LIMIT_MAX` | `10` | Converts per IP per window |
+| `RATE_LIMIT_WINDOW_SEC` | `60` | Rate-limit window |
+| `MAX_CONCURRENT_PER_IP` | `2` | Concurrent converts per IP |
+| `MAX_CONCURRENT_GLOBAL` | `5` | Global concurrent converts |
+| `ACCESS_TOKEN` | unset | If set, require `X-Access-Token` or `?token=` (private mode; do not commit) |
 
 ### Sample conversion test
 
@@ -176,6 +185,26 @@ npx wrangler r2 bucket create epub-converter-tmp-preview
 # or: npm run cf:r2:create
 ```
 
+### 1b. Create Workers KV for rate limits (once)
+
+Production abuse protection needs a KV namespace bound as `RATE_LIMIT` (in-memory counters are **not** safe across isolates).
+
+```bash
+npx wrangler kv namespace create RATE_LIMIT
+npx wrangler kv namespace create RATE_LIMIT --preview
+# or: npm run cf:kv:create
+```
+
+Paste the returned `id` / `preview_id` into `[[kv_namespaces]]` in `wrangler.toml` (replace the stub zeros).
+
+Optional private mode (do **not** commit the secret):
+
+```bash
+npx wrangler secret put ACCESS_TOKEN
+```
+
+Clients then send `X-Access-Token: …` or `?token=…`.
+
 ### 2. Build the web UI
 
 ```bash
@@ -232,7 +261,8 @@ Optional: set `CONVERTER_URL` as a Worker var only if you want an external Calib
 1. **Workers & Pages → epub-converter → Settings** — confirm the R2 `UPLOADS` binding and Container binding.
 2. **Workers & Pages → Containers** — inspect instance health, metrics, and logs.
 3. **R2** — confirm buckets `epub-converter-tmp` and `epub-converter-tmp-preview` exist.
-4. Enable a custom domain on the Worker if desired.
+4. **KV** — confirm `RATE_LIMIT` binding uses real namespace ids (not stub zeros).
+5. Enable a custom domain on the Worker if desired.
 
 For Git-based Cloudflare deploys, Docker is handled by Workers Builds. Only the optional direct CLI Container deploy above requires Docker locally.
 
@@ -259,6 +289,16 @@ Calibre is memory-heavy. This repo uses `instance_type = "standard-2"` (1 vCPU /
 | `npm run deploy` | `build:web` + `wrangler deploy` (full Containers deploy) |
 | `npm run deploy:worker` | `build:web` + Worker/UI deploy without Container rollout |
 | `docker compose up -d` | Local Calibre converter |
+| `npm run cf:r2:create` | Create R2 buckets |
+| `npm run cf:kv:create` | Create RATE_LIMIT KV namespaces |
+
+## Docs
+
+| Doc | Topic |
+|-----|--------|
+| [docs/plugins.md](docs/plugins.md) | Add a format / preset / guard |
+| [docs/formats-catalog.md](docs/formats-catalog.md) | Enabled vs wishlist formats |
+| [docs/high-performance.md](docs/high-performance.md) | Cold vs warm, R2 TTL, rate limits, cost |
 
 ## License
 

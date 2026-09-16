@@ -1,4 +1,4 @@
-import type { ConversionOptions, FormatId } from '@epub/shared';
+import { FORMATS, type ConversionOptions, type FormatId } from '@epub/shared';
 
 export interface ConvertRequest {
   buffer: Buffer;
@@ -29,7 +29,31 @@ export interface Converter {
   convert(req: ConvertRequest): Promise<ConvertResult>;
 }
 
-export const MIME: Record<FormatId, string> = {
+/** Output MIME overrides where shared mimeTypes[0] is not the convert result type. */
+const MIME_OVERRIDES: Partial<Record<FormatId, string>> = {
+  html: 'application/zip', // HTMLZ package
+};
+
+const EXT_OVERRIDES: Partial<Record<FormatId, string>> = {
+  html: '.htmlz',
+};
+
+export function mimeFor(format: FormatId): string {
+  return (
+    MIME_OVERRIDES[format] ||
+    FORMATS[format]?.mimeTypes[0] ||
+    'application/octet-stream'
+  );
+}
+
+export function extFor(format: FormatId): string {
+  if (EXT_OVERRIDES[format]) return EXT_OVERRIDES[format]!;
+  const ext = FORMATS[format]?.extensions[0];
+  return ext || `.${format}`;
+}
+
+/** @deprecated Prefer mimeFor / extFor — kept for stub converter */
+export const MIME: Partial<Record<FormatId, string>> = {
   epub: 'application/epub+zip',
   pdf: 'application/pdf',
   mobi: 'application/x-mobipocket-ebook',
@@ -42,7 +66,7 @@ export const MIME: Record<FormatId, string> = {
   rtf: 'application/rtf',
 };
 
-export const EXT: Record<FormatId, string> = {
+export const EXT: Partial<Record<FormatId, string>> = {
   epub: '.epub',
   pdf: '.pdf',
   mobi: '.mobi',

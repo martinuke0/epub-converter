@@ -13,8 +13,14 @@ app.use(
   cors({
     origin: (origin) => origin || '*',
     allowMethods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
-    allowHeaders: ['Content-Type'],
-    exposeHeaders: ['Content-Disposition', 'X-Job-Id', 'X-Stubbed', 'X-Filename'],
+    allowHeaders: ['Content-Type', 'X-Access-Token'],
+    exposeHeaders: [
+      'Content-Disposition',
+      'X-Job-Id',
+      'X-Stubbed',
+      'X-Filename',
+      'Retry-After',
+    ],
   })
 );
 

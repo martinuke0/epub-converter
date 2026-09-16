@@ -2,7 +2,7 @@
   "name": "epub-converter",
   "version": "1.0.0",
   "private": true,
-  "description": "Epub — Convert ebooks without the clutter.",
+  "description": "Epub \u2014 Convert ebooks without the clutter.",
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -17,7 +17,8 @@
     "typecheck": "npm run typecheck -w @epub/shared && npm run typecheck -w @epub/web && npm run typecheck -w @epub/api",
     "deploy": "npm run build:web && wrangler deploy",
     "deploy:worker": "npm run build:web && wrangler deploy --containers-rollout=none",
-    "cf:r2:create": "wrangler r2 bucket create epub-converter-tmp && wrangler r2 bucket create epub-converter-tmp-preview"
+    "cf:r2:create": "wrangler r2 bucket create epub-converter-tmp && wrangler r2 bucket create epub-converter-tmp-preview",
+    "cf:kv:create": "wrangler kv namespace create RATE_LIMIT && wrangler kv namespace create RATE_LIMIT --preview"
   },
   "devDependencies": {
     "@cloudflare/containers": "^0.3.7",

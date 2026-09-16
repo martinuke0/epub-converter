@@ -1,5 +1,5 @@
 import type { Converter, ConvertRequest, ConvertResult, ConverterHealth } from './types.js';
-import { EXT, MIME } from './types.js';
+import { extFor, mimeFor } from './types.js';
 
 /**
  * Calls a Calibre sidecar (Docker local or production CONVERTER_URL).
@@ -48,7 +48,7 @@ export class HttpConverter implements Converter {
 
   async convert(req: ConvertRequest): Promise<ConvertResult> {
     const form = new FormData();
-    const blob = new Blob([new Uint8Array(req.buffer)], { type: MIME[req.from] });
+    const blob = new Blob([new Uint8Array(req.buffer)], { type: mimeFor(req.from) });
     form.append('file', blob, req.filename);
     form.append('from', req.from);
     form.append('to', req.to);
@@ -76,8 +76,8 @@ export class HttpConverter implements Converter {
     const stem = req.filename.replace(/\.[^.]+$/, '');
     return {
       buffer: Buffer.from(ab),
-      filename: `${stem}${EXT[req.to]}`,
-      mimeType: MIME[req.to],
+      filename: `${stem}${extFor(req.to)}`,
+      mimeType: mimeFor(req.to),
       jobId,
     };
   }

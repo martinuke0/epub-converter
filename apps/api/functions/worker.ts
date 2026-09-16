@@ -2,16 +2,26 @@
  * Cloudflare Worker: static UI (ASSETS) + Calibre Cloudflare Container + R2 staging.
  *
  * Production flow:
- * 1. Accept multipart upload at /api/convert
- * 2. Optionally stage bytes in R2 (UPLOADS)
- * 3. POST file to Calibre container binding (fetch → container :8090/convert)
- * 4. Return converted bytes; delete R2 object
+ * 1. GuardPlugins (access token, size, rate limit, concurrent) via RATE_LIMIT KV
+ * 2. Accept multipart upload at /api/convert
+ * 3. Optionally stage bytes in R2 (UPLOADS)
+ * 4. POST file to Calibre container binding (fetch → container :8090/convert)
+ * 5. Return converted bytes; delete R2 object; release concurrency guards
  *
  * Local `npm run dev` still uses docker-compose + Hono (unchanged).
  * Optional CONVERTER_URL remains as an external fallback if the binding is absent.
  */
 
 import { Container, getContainer, getRandom } from '@cloudflare/containers';
+import {
+  MAX_FILE_SIZE_MB,
+  listGuards,
+  listUiPresets,
+  releaseGuards,
+  runGuards,
+  type GuardContext,
+  type GuardKv,
+} from '@epub/shared';
 
 /** Number of interchangeable Calibre instances (keep ≤ max_instances in wrangler.toml). */
 const CONTAINER_POOL = 3;
@@ -40,9 +50,17 @@ export interface Env {
   UPLOADS?: R2Bucket;
   CALIBRE_CONVERTER?: DurableObjectNamespace<CalibreConverter>;
   ASSETS?: Fetcher;
+  /** Workers KV for rate-limit / concurrency counters (create namespace once). */
+  RATE_LIMIT?: KVNamespace;
   /** Optional external Calibre URL (Compose / custom host). Unused when container binding works. */
   CONVERTER_URL?: string;
   MAX_FILE_SIZE_MB?: string;
+  /** If set, require X-Access-Token or ?token= (do not commit the value). */
+  ACCESS_TOKEN?: string;
+  RATE_LIMIT_MAX?: string;
+  RATE_LIMIT_WINDOW_SEC?: string;
+  MAX_CONCURRENT_PER_IP?: string;
+  MAX_CONCURRENT_GLOBAL?: string;
 }
 
 const MAX_DEFAULT = 80;
@@ -53,7 +71,6 @@ function hasContainer(env: Env): env is Env & {
   return !!env.CALIBRE_CONVERTER;
 }
 
-/** Build a request aimed at the container process path (not the Worker /api path). */
 function containerRequest(path: string, init?: RequestInit): Request {
   return new Request(`http://container${path}`, init);
 }
@@ -79,6 +96,52 @@ async function fetchConverter(
   throw new Error(
     'No Calibre converter configured. Deploy with CALIBRE_CONVERTER container binding, or set CONVERTER_URL.'
   );
+}
+
+function clientIp(request: Request): string {
+  return (
+    request.headers.get('cf-connecting-ip') ||
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    'unknown'
+  );
+}
+
+function readAccessToken(request: Request, url: URL): string | null {
+  return (
+    request.headers.get('x-access-token') || url.searchParams.get('token') || null
+  );
+}
+
+function kvAdapter(ns: KVNamespace | undefined): GuardKv | undefined {
+  if (!ns) return undefined;
+  return {
+    get: (key) => ns.get(key),
+    put: (key, value, options) => ns.put(key, value, options),
+    delete: (key) => ns.delete(key),
+  };
+}
+
+function guardEnv(env: Env): Record<string, string | undefined> {
+  return {
+    ACCESS_TOKEN: env.ACCESS_TOKEN,
+    RATE_LIMIT_MAX: env.RATE_LIMIT_MAX,
+    RATE_LIMIT_WINDOW_SEC: env.RATE_LIMIT_WINDOW_SEC,
+    MAX_CONCURRENT_PER_IP: env.MAX_CONCURRENT_PER_IP,
+    MAX_CONCURRENT_GLOBAL: env.MAX_CONCURRENT_GLOBAL,
+    MAX_FILE_SIZE_MB: env.MAX_FILE_SIZE_MB,
+  };
+}
+
+function jsonError(
+  body: { error: string; code?: string; retryAfterSec?: number; detail?: string },
+  status: number,
+  retryAfterSec?: number
+): Response {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (retryAfterSec != null) headers['Retry-After'] = String(retryAfterSec);
+  return new Response(JSON.stringify(body), { status, headers });
 }
 
 export default {
@@ -112,6 +175,7 @@ export default {
         detail = e instanceof Error ? e.message : String(e);
       }
 
+      const maxMb = Number(env.MAX_FILE_SIZE_MB || MAX_DEFAULT);
       return Response.json({
         ok: true,
         runtime: 'cloudflare-worker',
@@ -120,36 +184,86 @@ export default {
           detail,
           engine,
           version,
+          mode: hasContainer(env)
+            ? 'cloudflare-container'
+            : env.CONVERTER_URL
+              ? 'converter-url'
+              : 'none',
           via: hasContainer(env)
             ? 'cloudflare-container'
             : env.CONVERTER_URL
               ? 'converter-url'
               : 'none',
         },
+        maxFileSizeMb: maxMb,
+        warming: !converterOk,
         r2: !!env.UPLOADS,
+        kv: !!env.RATE_LIMIT,
         assets: !!env.ASSETS,
+        privateMode: !!env.ACCESS_TOKEN,
+      });
+    }
+
+    if (url.pathname === '/api/presets' && request.method === 'GET') {
+      return Response.json({
+        presets: listUiPresets().map((p) => ({
+          id: p.id,
+          label: p.label,
+          description: p.description,
+          appliesTo: p.appliesTo,
+          options: p.options,
+          ui: p.ui,
+        })),
       });
     }
 
     if (url.pathname === '/api/convert' && request.method === 'POST') {
       if (!hasContainer(env) && !env.CONVERTER_URL) {
-        return Response.json(
+        return jsonError(
           {
             error:
               'Calibre converter not configured. Deploy Cloudflare Containers (CALIBRE_CONVERTER) or set CONVERTER_URL.',
+            code: 'converter_unavailable',
           },
-          { status: 503 }
+          503
         );
       }
 
-      const maxMb = Number(env.MAX_FILE_SIZE_MB || MAX_DEFAULT);
+      const maxMb = Number(env.MAX_FILE_SIZE_MB || MAX_FILE_SIZE_MB || MAX_DEFAULT);
+      const maxBytes = maxMb * 1024 * 1024;
       const form = await request.formData();
       const file = form.get('file');
       if (!(file instanceof File)) {
-        return Response.json({ error: 'Missing file' }, { status: 400 });
+        return jsonError({ error: 'Missing file' }, 400);
       }
-      if (file.size > maxMb * 1024 * 1024) {
-        return Response.json({ error: `File exceeds ${maxMb}MB` }, { status: 413 });
+      if (file.size === 0) {
+        return jsonError({ error: 'Empty file' }, 400);
+      }
+
+      const guardCtx: GuardContext = {
+        ip: clientIp(request),
+        fileSize: file.size,
+        maxFileSizeBytes: maxBytes,
+        accessToken: readAccessToken(request, url),
+        env: guardEnv(env),
+        kv: kvAdapter(env.RATE_LIMIT),
+      };
+
+      // Without KV, rate/concurrent guards no-op on counters (access-token + size still work).
+      // Prefer binding RATE_LIMIT in wrangler.toml for production.
+      const { decision, acquired } = await runGuards(listGuards(), guardCtx);
+      if (!decision.allow) {
+        return jsonError(
+          {
+            error: decision.error,
+            code: decision.code,
+            ...(decision.retryAfterSec != null
+              ? { retryAfterSec: decision.retryAfterSec }
+              : {}),
+          },
+          decision.status,
+          decision.retryAfterSec
+        );
       }
 
       const key = `tmp/${crypto.randomUUID()}`;
@@ -177,9 +291,16 @@ export default {
 
         if (!res.ok) {
           const text = await res.text();
-          return Response.json(
+          // Propagate upstream 413 if present
+          if (res.status === 413) {
+            return jsonError(
+              { error: `File exceeds ${maxMb}MB`, code: 'too_large', detail: text.slice(0, 500) },
+              413
+            );
+          }
+          return jsonError(
             { error: 'Upstream conversion failed', detail: text.slice(0, 2000) },
-            { status: 502 }
+            502
           );
         }
 
@@ -188,20 +309,23 @@ export default {
             'Content-Type': res.headers.get('Content-Type') || 'application/octet-stream',
             'Content-Disposition':
               res.headers.get('Content-Disposition') || 'attachment',
+            'X-Filename':
+              res.headers.get('X-Filename') ||
+              file.name.replace(/\.[^.]+$/, '') + (typeof to === 'string' ? `.${to}` : ''),
           },
         });
       } finally {
+        await releaseGuards(acquired, guardCtx);
         if (env.UPLOADS) {
           await env.UPLOADS.delete(key).catch(() => undefined);
         }
       }
     }
 
-    // Non-/api requests: SPA assets (run_worker_first only covers /api/*).
     if (env.ASSETS) {
       return env.ASSETS.fetch(request);
     }
 
-    return Response.json({ error: 'Not found' }, { status: 404 });
+    return jsonError({ error: 'Not found' }, 404);
   },
 };

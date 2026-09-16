@@ -20,13 +20,15 @@ export function FormatPicker({ value, capabilities, onChange, disabled }: Props)
 
   return (
     <div className="space-y-3">
-      <div className="flex items-baseline justify-between gap-2">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-2">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-ink-muted)]">
           Output format
         </h2>
-        <span className="text-xs text-[var(--color-ink-muted)]">Only sensible targets are enabled</span>
+        <span className="text-xs text-[var(--color-ink-muted)]">
+          Only sensible targets are enabled
+        </span>
       </div>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-5">
         {sorted.map((cap) => {
           const fmt = FORMATS[cap.to];
           const selected = value === cap.to;
@@ -39,24 +41,22 @@ export function FormatPicker({ value, capabilities, onChange, disabled }: Props)
               title={cap.enabled ? fmt.label : cap.reason}
               onClick={() => onChange(cap.to)}
               className={[
-                'relative rounded-xl border px-3 py-3 text-left transition',
+                'relative min-h-[3.25rem] rounded-xl border px-2.5 py-2.5 text-left transition sm:px-3 sm:py-3',
                 selected
-                  ? 'border-brand-500 bg-brand-50 ring-2 ring-brand-500/30 dark:bg-brand-950/40'
+                  ? 'border-brand-500 bg-brand-50 ring-2 ring-brand-500/30'
                   : 'border-[var(--color-border)] bg-[var(--color-surface)]',
-                cap.enabled
-                  ? 'hover:border-brand-400'
-                  : 'cursor-not-allowed opacity-45',
+                cap.enabled ? 'hover:border-brand-400' : 'cursor-not-allowed opacity-45',
                 hero && cap.enabled ? 'shadow-sm' : '',
               ].join(' ')}
             >
-              <div className="text-sm font-semibold text-[var(--color-ink)]">{fmt.label}</div>
+              <div className="pr-8 text-sm font-semibold text-[var(--color-ink)]">{fmt.label}</div>
               {!cap.enabled && (
                 <div className="mt-0.5 line-clamp-2 text-[10px] leading-tight text-[var(--color-ink-muted)]">
                   {cap.reason}
                 </div>
               )}
               {hero && cap.enabled && (
-                <span className="absolute right-2 top-2 rounded-full bg-brand-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-brand-700 dark:bg-brand-900 dark:text-brand-300">
+                <span className="absolute right-1.5 top-1.5 rounded-full bg-brand-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-brand-700 sm:right-2 sm:top-2">
                   hero
                 </span>
               )}
