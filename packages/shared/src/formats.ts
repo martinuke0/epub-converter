@@ -1,11 +1,11 @@
 /**
  * Format catalog — source of truth for FormatId + capability matrix.
- * Enabled v1 sublist: epub, pdf, mobi, azw3, fb2, txt, html, markdown, docx, rtf.
- * Additional ids are registered as coming-soon / disabled (see docs/formats-catalog.md).
+ * Enabled: every Calibre-realistic format from our catalog.
+ * Still blocked: DRM / non-ebook / RAR-painful / unsupported (see docs/formats-catalog.md).
  */
 
 export type FormatId =
-  // Enabled v1
+  // Core
   | 'epub'
   | 'pdf'
   | 'mobi'
@@ -16,10 +16,11 @@ export type FormatId =
   | 'markdown'
   | 'docx'
   | 'rtf'
-  // Catalog / coming soon
+  // Comics / scans
   | 'cbz'
   | 'cbr'
   | 'djvu'
+  // Legacy / device
   | 'lit'
   | 'pdb'
   | 'pml'
@@ -28,8 +29,6 @@ export type FormatId =
   | 'tcr'
   | 'txtz'
   | 'htmlz'
-  | 'odt'
-  | 'svg'
   | 'kepub'
   | 'lrf'
   | 'pmlz'
@@ -37,21 +36,27 @@ export type FormatId =
   | 'fbz'
   | 'azw'
   | 'azw4'
+  // Office extras
+  | 'odt'
+  // Catalog-only blocked
+  | 'svg'
   | 'tex'
   | 'rst'
-  | 'org';
+  | 'org'
+  | 'pptx'
+  | 'csv';
 
 export interface FormatInfo {
   id: FormatId;
   label: string;
   extensions: string[];
   mimeTypes: string[];
-  /** Whether Calibre ebook-convert can reliably read this format */
+  /** Whether the conversion engine can reliably read this format */
   canInput: boolean;
-  /** Whether Calibre ebook-convert can write this format */
+  /** Whether the conversion engine can write this format */
   canOutput: boolean;
   notes?: string;
-  /** Registered in catalog but not offered for convert yet */
+  /** Registered in catalog but not offered for convert */
   comingSoon?: boolean;
 }
 
@@ -61,7 +66,7 @@ function enabled(
   return { ...partial, comingSoon: false };
 }
 
-function soon(
+function blocked(
   partial: Omit<FormatInfo, 'canInput' | 'canOutput' | 'comingSoon'> & {
     canInput?: boolean;
     canOutput?: boolean;
@@ -79,6 +84,7 @@ function soon(
 }
 
 export const FORMATS: Record<FormatId, FormatInfo> = {
+  // --- Core (always on) ---
   epub: enabled({
     id: 'epub',
     label: 'EPUB',
@@ -99,7 +105,7 @@ export const FORMATS: Record<FormatId, FormatInfo> = {
   mobi: enabled({
     id: 'mobi',
     label: 'MOBI',
-    extensions: ['.mobi'],
+    extensions: ['.mobi', '.prc'],
     mimeTypes: ['application/x-mobipocket-ebook'],
     canInput: true,
     canOutput: true,
@@ -144,7 +150,7 @@ export const FORMATS: Record<FormatId, FormatInfo> = {
     mimeTypes: ['text/markdown', 'text/x-markdown'],
     canInput: true,
     canOutput: false,
-    notes: 'Markdown input supported; no Markdown writer',
+    notes: 'Markdown input only — no Markdown writer',
   }),
   docx: enabled({
     id: 'docx',
@@ -165,167 +171,218 @@ export const FORMATS: Record<FormatId, FormatInfo> = {
     canOutput: true,
   }),
 
-  // --- Catalog / coming soon ---
-  cbz: soon({
+  // --- Comics / scans ---
+  cbz: enabled({
     id: 'cbz',
     label: 'CBZ',
     extensions: ['.cbz'],
     mimeTypes: ['application/vnd.comicbook+zip', 'application/x-cbz'],
-    reason: 'Comic archives need a dedicated pipeline',
+    canInput: true,
+    canOutput: false,
+    notes: 'Comic ZIP input — image-based; reflow is limited',
   }),
-  cbr: soon({
+  cbr: blocked({
     id: 'cbr',
     label: 'CBR',
     extensions: ['.cbr'],
     mimeTypes: ['application/vnd.comicbook-rar', 'application/x-cbr'],
-    reason: 'RAR dependency — coming soon',
+    reason: 'Needs unrar in the converter image — use CBZ instead',
   }),
-  djvu: soon({
+  djvu: enabled({
     id: 'djvu',
     label: 'DjVu',
     extensions: ['.djvu', '.djv'],
     mimeTypes: ['image/vnd.djvu', 'image/x-djvu'],
-    reason: 'Optional engine extra — not enabled yet',
+    canInput: true,
+    canOutput: false,
+    notes: 'Best results when the DjVu contains embedded OCR text',
   }),
-  lit: soon({
+
+  // --- Legacy / device (Calibre FAQ) ---
+  lit: enabled({
     id: 'lit',
     label: 'LIT',
     extensions: ['.lit'],
     mimeTypes: ['application/x-ms-reader'],
-    reason: 'Legacy Microsoft Reader — coming soon',
+    canInput: true,
+    canOutput: true,
   }),
-  pdb: soon({
+  pdb: enabled({
     id: 'pdb',
     label: 'PDB',
     extensions: ['.pdb'],
     mimeTypes: ['application/vnd.palm'],
-    reason: 'Many Palm variants — coming soon',
+    canInput: true,
+    canOutput: true,
+    notes: 'Palm/eReader/Plucker/PML/zTxt variants — quality varies',
   }),
-  pml: soon({
+  pml: enabled({
     id: 'pml',
     label: 'PML',
     extensions: ['.pml'],
     mimeTypes: ['text/x-palm-markup'],
-    reason: 'Palm markup — coming soon',
+    canInput: true,
+    canOutput: false,
+    notes: 'Palm markup input — use PMLZ for output',
   }),
-  rb: soon({
+  rb: enabled({
     id: 'rb',
     label: 'RB',
     extensions: ['.rb'],
     mimeTypes: ['application/x-rocketebook'],
-    reason: 'RocketEbook legacy — coming soon',
+    canInput: true,
+    canOutput: true,
   }),
-  snb: soon({
+  snb: enabled({
     id: 'snb',
     label: 'SNB',
     extensions: ['.snb'],
     mimeTypes: ['application/x-shanda-bambook'],
-    reason: 'Shanda Bambook — coming soon',
+    canInput: true,
+    canOutput: true,
   }),
-  tcr: soon({
+  tcr: enabled({
     id: 'tcr',
     label: 'TCR',
     extensions: ['.tcr'],
     mimeTypes: ['application/x-psion-tcr'],
-    reason: 'Psion text — coming soon',
+    canInput: true,
+    canOutput: true,
   }),
-  txtz: soon({
+  txtz: enabled({
     id: 'txtz',
     label: 'TXTZ',
     extensions: ['.txtz'],
-    mimeTypes: ['application/zip'],
-    reason: 'Zipped text package — coming soon',
+    mimeTypes: ['application/zip', 'application/x-txtz'],
+    canInput: true,
+    canOutput: true,
   }),
-  htmlz: soon({
+  htmlz: enabled({
     id: 'htmlz',
     label: 'HTMLZ',
     extensions: ['.htmlz'],
     mimeTypes: ['application/zip', 'application/x-htmlz'],
-    reason: 'Explicit HTMLZ id — coming soon (HTML output already uses HTMLZ)',
+    canInput: true,
+    canOutput: true,
   }),
-  odt: soon({
-    id: 'odt',
-    label: 'ODT',
-    extensions: ['.odt'],
-    mimeTypes: ['application/vnd.oasis.opendocument.text'],
-    reason: 'Needs stable round-trip checks — coming soon',
-  }),
-  svg: soon({
-    id: 'svg',
-    label: 'SVG',
-    extensions: ['.svg'],
-    mimeTypes: ['image/svg+xml'],
-    reason: 'Single-image / niche — coming soon',
-  }),
-  kepub: soon({
+  kepub: enabled({
     id: 'kepub',
     label: 'KEPUB',
     extensions: ['.kepub', '.kepub.epub'],
     mimeTypes: ['application/epub+zip'],
-    reason: 'Kobo variant needs dedicated flags — coming soon',
+    canInput: true,
+    canOutput: true,
+    notes: 'Kobo EPUB variant',
   }),
-  lrf: soon({
+  lrf: enabled({
     id: 'lrf',
     label: 'LRF',
     extensions: ['.lrf'],
     mimeTypes: ['application/x-sony-bbeb'],
-    reason: 'Sony legacy — coming soon',
+    canInput: true,
+    canOutput: true,
   }),
-  pmlz: soon({
+  pmlz: enabled({
     id: 'pmlz',
     label: 'PMLZ',
     extensions: ['.pmlz'],
-    mimeTypes: ['application/zip'],
-    reason: 'Zipped PML — coming soon',
+    mimeTypes: ['application/zip', 'application/x-pmlz'],
+    canInput: false,
+    canOutput: true,
+    notes: 'Zipped PML output — use PML for input',
   }),
-  chm: soon({
+  chm: enabled({
     id: 'chm',
     label: 'CHM',
     extensions: ['.chm'],
     mimeTypes: ['application/vnd.ms-htmlhelp'],
-    reason: 'Security/size concerns — coming soon',
+    canInput: true,
+    canOutput: false,
+    notes: 'Windows help input — large/complex CHMs may fail',
   }),
-  fbz: soon({
+  fbz: enabled({
     id: 'fbz',
     label: 'FBZ',
     extensions: ['.fbz'],
-    mimeTypes: ['application/zip'],
-    reason: 'Zipped FB2 — coming soon',
+    mimeTypes: ['application/zip', 'application/x-fbz'],
+    canInput: true,
+    canOutput: false,
+    notes: 'Zipped FB2 input',
   }),
-  azw: soon({
+  azw: enabled({
     id: 'azw',
     label: 'AZW',
     extensions: ['.azw'],
     mimeTypes: ['application/vnd.amazon.ebook'],
-    reason: 'Prefer AZW3; DRM often present — coming soon',
+    canInput: true,
+    canOutput: false,
+    notes: 'Kindle legacy input — DRM-free only; prefer AZW3 output',
   }),
-  azw4: soon({
+  azw4: enabled({
     id: 'azw4',
     label: 'AZW4',
     extensions: ['.azw4'],
     mimeTypes: ['application/vnd.amazon.ebook'],
-    reason: 'Print replica; poor reflow — coming soon',
+    canInput: true,
+    canOutput: false,
+    notes: 'Print replica input — poor reflow',
   }),
-  tex: soon({
+
+  // --- Office extras ---
+  odt: enabled({
+    id: 'odt',
+    label: 'ODT',
+    extensions: ['.odt'],
+    mimeTypes: ['application/vnd.oasis.opendocument.text'],
+    canInput: true,
+    canOutput: false,
+    notes: 'OpenDocument text input',
+  }),
+
+  // --- Blocked (not realistic / not ebook-convert) ---
+  svg: blocked({
+    id: 'svg',
+    label: 'SVG',
+    extensions: ['.svg'],
+    mimeTypes: ['image/svg+xml'],
+    reason: 'Single-image niche — not a standard ebook-convert path',
+  }),
+  tex: blocked({
     id: 'tex',
     label: 'LaTeX',
     extensions: ['.tex'],
     mimeTypes: ['application/x-tex', 'text/x-tex'],
-    reason: 'Fragile conversion — coming soon',
+    reason: 'Not supported by ebook-convert',
   }),
-  rst: soon({
+  rst: blocked({
     id: 'rst',
     label: 'reStructuredText',
     extensions: ['.rst'],
     mimeTypes: ['text/x-rst'],
-    reason: 'Optional later — coming soon',
+    reason: 'Not supported by ebook-convert',
   }),
-  org: soon({
+  org: blocked({
     id: 'org',
     label: 'Org-mode',
     extensions: ['.org'],
     mimeTypes: ['text/org', 'text/x-org'],
-    reason: 'Optional later — coming soon',
+    reason: 'Not supported by ebook-convert',
+  }),
+  pptx: blocked({
+    id: 'pptx',
+    label: 'PPTX',
+    extensions: ['.pptx'],
+    mimeTypes: [
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    ],
+    reason: 'ebook-convert does not accept PowerPoint as input',
+  }),
+  csv: blocked({
+    id: 'csv',
+    label: 'CSV',
+    extensions: ['.csv'],
+    mimeTypes: ['text/csv'],
+    reason: 'ebook-convert does not accept CSV as input',
   }),
 };
 
@@ -339,25 +396,26 @@ const BLOCKED_PAIRS: Array<{
   from: FormatId;
   to: FormatId;
   reason: string;
-}> = ENABLED_FORMAT_IDS.filter((id) => FORMATS[id].canInput && FORMATS[id].canOutput).map(
-  (id) => ({
-    from: id,
-    to: id,
-    reason: 'Same format — no conversion needed',
-  })
-);
+}> = ENABLED_FORMAT_IDS.filter(
+  (id) => FORMATS[id].canInput && FORMATS[id].canOutput
+).map((id) => ({
+  from: id,
+  to: id,
+  reason: 'Same format — no conversion needed',
+}));
 
 export function detectFormat(
   filename: string,
   mimeType?: string
 ): FormatId | null {
   const lower = filename.toLowerCase();
-  // Prefer longer extensions first (e.g. .kepub.epub)
-  const sorted = Object.values(FORMATS).slice().sort(
-    (a, b) =>
-      Math.max(...b.extensions.map((e) => e.length)) -
-      Math.max(...a.extensions.map((e) => e.length))
-  );
+  const sorted = Object.values(FORMATS)
+    .slice()
+    .sort(
+      (a, b) =>
+        Math.max(...b.extensions.map((e) => e.length)) -
+        Math.max(...a.extensions.map((e) => e.length))
+    );
   for (const format of sorted) {
     if (format.extensions.some((ext) => lower.endsWith(ext))) {
       return format.id;
@@ -376,6 +434,10 @@ export function detectFormat(
 export function getDefaultOutput(input: FormatId): FormatId {
   if (input === 'epub') return 'pdf';
   if (input === 'pdf') return 'epub';
+  if (input === 'azw' || input === 'azw4') return 'epub';
+  if (input === 'cbz' || input === 'djvu') return 'pdf';
+  if (input === 'chm' || input === 'odt' || input === 'fbz') return 'epub';
+  if (input === 'pml') return 'epub';
   return 'epub';
 }
 
@@ -390,12 +452,14 @@ export function getCapabilities(from: FormatId): ConversionCapability[] {
   if (!input) {
     return [];
   }
-  return ENABLED_FORMAT_IDS.map((to) => {
+  // Output targets: enabled formats that can be written
+  const outputs = ENABLED_FORMAT_IDS.filter((id) => FORMATS[id].canOutput);
+  return outputs.map((to) => {
     if (input.comingSoon || !input.canInput) {
       return {
         to,
         enabled: false,
-        reason: input.notes || `${input.label} is not available yet`,
+        reason: input.notes || `${input.label} is not available as input`,
       };
     }
     const output = FORMATS[to];
@@ -406,23 +470,32 @@ export function getCapabilities(from: FormatId): ConversionCapability[] {
         reason: output.notes || `${output.label} is not supported as output`,
       };
     }
-    const blocked = BLOCKED_PAIRS.find((p) => p.from === from && p.to === to);
-    if (blocked) {
-      return { to, enabled: false, reason: blocked.reason };
+    const blockedPair = BLOCKED_PAIRS.find((p) => p.from === from && p.to === to);
+    if (blockedPair) {
+      return { to, enabled: false, reason: blockedPair.reason };
     }
     return { to, enabled: true };
   });
 }
 
-export function isConversionSupported(from: FormatId, to: FormatId): {
+export function isConversionSupported(
+  from: FormatId,
+  to: FormatId
+): {
   ok: boolean;
   reason?: string;
 } {
-  if (FORMATS[from]?.comingSoon) {
-    return { ok: false, reason: FORMATS[from].notes || 'Format coming soon' };
+  if (FORMATS[from]?.comingSoon || !FORMATS[from]?.canInput) {
+    return {
+      ok: false,
+      reason: FORMATS[from]?.notes || 'Format not available as input',
+    };
   }
-  if (FORMATS[to]?.comingSoon) {
-    return { ok: false, reason: FORMATS[to].notes || 'Format coming soon' };
+  if (FORMATS[to]?.comingSoon || !FORMATS[to]?.canOutput) {
+    return {
+      ok: false,
+      reason: FORMATS[to]?.notes || 'Format not available as output',
+    };
   }
   const caps = getCapabilities(from);
   const match = caps.find((c) => c.to === to);

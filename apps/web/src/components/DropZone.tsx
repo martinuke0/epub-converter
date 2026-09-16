@@ -98,8 +98,8 @@ export function DropZone({ onFiles, disabled }: Props) {
             Drop ebooks here, or <span className="text-brand-600">browse</span>
           </p>
           <p className="mt-1 text-xs leading-relaxed text-[var(--color-ink-muted)] sm:text-sm">
-            EPUB, PDF, MOBI, AZW3, FB2, DOCX, RTF, HTML, Markdown, TXT — up to{' '}
-            {MAX_FILE_SIZE_MB}MB each
+            EPUB, PDF, Kindle, comics (CBZ), Office, and more — up to {MAX_FILE_SIZE_MB}MB
+            each
           </p>
         </div>
         <input

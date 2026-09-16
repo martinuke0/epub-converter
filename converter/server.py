@@ -24,7 +24,8 @@ MAX_BYTES = MAX_MB * 1024 * 1024
 
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
-# Format extension map (Calibre uses these suffixes)
+# Format extension map (Calibre ebook-convert suffixes)
+# Keep in sync with packages/shared FORMATS (enabled entries).
 INPUT_EXT = {
     "epub": ".epub",
     "pdf": ".pdf",
@@ -36,6 +37,23 @@ INPUT_EXT = {
     "markdown": ".md",
     "docx": ".docx",
     "rtf": ".rtf",
+    "cbz": ".cbz",
+    "djvu": ".djvu",
+    "lit": ".lit",
+    "pdb": ".pdb",
+    "pml": ".pml",
+    "rb": ".rb",
+    "snb": ".snb",
+    "tcr": ".tcr",
+    "txtz": ".txtz",
+    "htmlz": ".htmlz",
+    "kepub": ".kepub",
+    "lrf": ".lrf",
+    "chm": ".chm",
+    "fbz": ".fbz",
+    "azw": ".azw",
+    "azw4": ".azw4",
+    "odt": ".odt",
 }
 
 OUTPUT_EXT = {
@@ -45,9 +63,19 @@ OUTPUT_EXT = {
     "azw3": ".azw3",
     "fb2": ".fb2",
     "txt": ".txt",
-    "html": ".htmlz",  # Calibre HTML package
+    "html": ".htmlz",  # HTML output → Calibre HTMLZ package
     "docx": ".docx",
     "rtf": ".rtf",
+    "lit": ".lit",
+    "pdb": ".pdb",
+    "rb": ".rb",
+    "snb": ".snb",
+    "tcr": ".tcr",
+    "txtz": ".txtz",
+    "htmlz": ".htmlz",
+    "kepub": ".kepub",
+    "lrf": ".lrf",
+    "pmlz": ".pmlz",
 }
 
 # Back-compat alias used elsewhere
@@ -111,8 +139,10 @@ def formats():
             "engine": "calibre",
             "notes": {
                 "pdf": "PDF→ebook reflow quality varies by source layout",
-                "html": "Output is Calibre HTMLZ (zipped HTML)",
-                "markdown": "Input only — Calibre has no Markdown writer",
+                "html": "Output is HTMLZ (zipped HTML)",
+                "markdown": "Input only — no Markdown writer",
+                "cbz": "Comic ZIP input only",
+                "djvu": "Best with embedded OCR text",
             },
         }
     )
@@ -257,6 +287,15 @@ def convert():
             ".htmlz": "application/zip",
             ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             ".rtf": "application/rtf",
+            ".lit": "application/x-ms-reader",
+            ".pdb": "application/vnd.palm",
+            ".rb": "application/x-rocketebook",
+            ".snb": "application/x-shanda-bambook",
+            ".tcr": "application/x-psion-tcr",
+            ".txtz": "application/zip",
+            ".kepub": "application/epub+zip",
+            ".lrf": "application/x-sony-bbeb",
+            ".pmlz": "application/zip",
         }.get(OUTPUT_EXT[to_format], "application/octet-stream")
 
         response = send_file(

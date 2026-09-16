@@ -28,7 +28,7 @@ export function FormatPicker({ value, capabilities, onChange, disabled }: Props)
           Only sensible targets are enabled
         </span>
       </div>
-      <div className="grid grid-cols-2 gap-2 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
         {sorted.map((cap) => {
           const fmt = FORMATS[cap.to];
           const selected = value === cap.to;

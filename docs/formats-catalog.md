@@ -1,74 +1,76 @@
 # Formats catalog
 
 Shared source of truth: `packages/shared` (`FormatPlugin` registry + `FORMATS`).  
-Calibre `ebook-convert` remains the engine; formats that Calibre cannot reliably handle stay **registered but disabled** (`canInput` / `canOutput` false) with a reason.
+The conversion engine is Calibre `ebook-convert` (see technical README). Formats the engine cannot handle stay **registered but disabled** (`comingSoon`) with a reason.
 
-## Enabled now (v1 sublist)
+## Enabled (Calibre-realistic)
 
-These are wired for conversion (subject to same-format blocks and capability matrix):
+### Core
 
-| Id | Label | Input | Output | Notes |
-|----|-------|:-----:|:------:|-------|
+| Id | Label | In | Out | Notes |
+|----|-------|:--:|:---:|-------|
 | `epub` | EPUB | ✓ | ✓ | Hero pair with PDF |
 | `pdf` | PDF | ✓ | ✓ | PDF→ebook reflow varies |
-| `mobi` | MOBI | ✓ | ✓ | |
+| `mobi` | MOBI | ✓ | ✓ | Also accepts `.prc` as input suffix |
 | `azw3` | AZW3 | ✓ | ✓ | |
 | `fb2` | FB2 | ✓ | ✓ | |
 | `txt` | TXT | ✓ | ✓ | |
-| `html` | HTML | ✓ | ✓ | Output is Calibre HTMLZ |
+| `html` | HTML | ✓ | ✓ | Output is HTMLZ |
 | `markdown` | Markdown | ✓ | — | Input only |
 | `docx` | DOCX | ✓ | ✓ | |
 | `rtf` | RTF | ✓ | ✓ | |
 
-## Wishlist / coming soon (registered, disabled)
+### Kindle / device / legacy
 
-Registered as FormatPlugins so the UI and API can show “coming soon” without hardcoding. **Not** enabled for convert until Calibre (or a dedicated plugin path) is validated.
+| Id | Label | In | Out | Notes |
+|----|-------|:--:|:---:|-------|
+| `azw` | AZW | ✓ | — | DRM-free only; prefer AZW3 out |
+| `azw4` | AZW4 | ✓ | — | Print replica; poor reflow |
+| `kepub` | KEPUB | ✓ | ✓ | Kobo EPUB variant |
+| `lit` | LIT | ✓ | ✓ | |
+| `lrf` | LRF | ✓ | ✓ | Sony |
+| `pdb` | PDB | ✓ | ✓ | Palm variants vary |
+| `pml` | PML | ✓ | — | Use PMLZ for output |
+| `pmlz` | PMLZ | — | ✓ | Zipped PML |
+| `rb` | RB | ✓ | ✓ | RocketEbook |
+| `snb` | SNB | ✓ | ✓ | |
+| `tcr` | TCR | ✓ | ✓ | |
+| `txtz` | TXTZ | ✓ | ✓ | |
+| `htmlz` | HTMLZ | ✓ | ✓ | Explicit HTMLZ (vs HTML→HTMLZ) |
+| `chm` | CHM | ✓ | — | Large/complex CHMs may fail |
+| `fbz` | FBZ | ✓ | — | Zipped FB2 |
 
-| Id | Label | Direction intent | Why disabled |
-|----|-------|------------------|--------------|
-| `cbz` | CBZ | in/out | Comic archives need different pipeline |
-| `cbr` | CBR | in | RAR dependency / licensing |
-| `djvu` | DjVu | in | Optional Calibre extra; heavy |
-| `lit` | LIT | in | Legacy Microsoft Reader |
-| `pdb` | PDB | in/out | Many Palm variants |
-| `pml` | PML | in | Palm markup |
-| `rb` | RB | in | RocketEbook legacy |
-| `snb` | SNB | in/out | Shanda Bambook |
-| `tcr` | TCR | in | Psion text compression |
-| `txtz` | TXTZ | in/out | Zipped plain text package |
-| `htmlz` | HTMLZ | in/out | Distinct from HTML→HTMLZ output mapping |
-| `odt` | ODT | in/out | Needs stable round-trip checks |
-| `svg` | SVG | in | Single-image / niche |
-| `comic` | Comic (generic) | in | Prefer explicit CBZ |
-| `mp3` | Audiobook MP3 | — | Out of scope (not ebook-convert) |
-| `kepub` | KEPUB | out | Kobo variant; needs dedicated flags |
-| `ibooks` | iBooks | — | Proprietary packaging |
-| `lrf` | LRF | in/out | Sony legacy |
-| `pmlz` | PMLZ | in | Zipped PML |
-| `chm` | CHM | in | Windows help; security/size concerns |
-| `pptx` | PPTX | in | Not a reading format |
-| `xlsx` | XLSX | — | Out of scope |
-| `csv` | CSV | — | Out of scope |
-| `tex` | LaTeX | in | Fragile; optional later |
-| `rst` | reStructuredText | in | Optional later |
-| `org` | Org-mode | in | Optional later |
-| `wiki` | Wiki markup | in | Optional later |
-| `fbz` | FBZ | in | Zipped FB2 |
-| `azw` | AZW (legacy) | in | Prefer AZW3; DRM often present |
-| `azw4` | AZW4 | in | Print replica; poor reflow |
-| `kfx` | KFX | — | DRM / proprietary |
-| `tpz` | TPZ | in | Topaz legacy |
-| `lrx` | LRX | — | Sony DRM |
-| `mbp` | MBP | — | Kindle sidecar, not a book |
-| `ncx` | NCX | — | TOC fragment, not a book |
-| `opf` | OPF | in | Package metadata only |
-| `nav` | NAV XHTML | — | EPUB3 fragment |
+### Comics / scans
+
+| Id | Label | In | Out | Notes |
+|----|-------|:--:|:---:|-------|
+| `cbz` | CBZ | ✓ | — | Comic ZIP; image-based |
+| `djvu` | DjVu | ✓ | — | Best with embedded OCR text |
+
+### Office extras
+
+| Id | Label | In | Out | Notes |
+|----|-------|:--:|:---:|-------|
+| `odt` | ODT | ✓ | — | OpenDocument text |
+
+## Still blocked (registered, disabled)
+
+| Id | Label | Why |
+|----|-------|-----|
+| `cbr` | CBR | Needs **unrar** in the converter image — use **CBZ** instead |
+| `pptx` | PPTX | `ebook-convert` does not accept PowerPoint |
+| `csv` | CSV | `ebook-convert` does not accept CSV |
+| `svg` | SVG | Not a standard ebook-convert path |
+| `tex` | LaTeX | Not supported by ebook-convert |
+| `rst` | reStructuredText | Not supported by ebook-convert |
+| `org` | Org-mode | Not supported by ebook-convert |
+
+Intentionally **not** in the product catalog as convertible books: MP3, XLSX, KFX (DRM), iBooks, MBP, NCX, OPF-as-book, etc.
 
 ## How enablement works
 
-1. Add or edit a `FormatPlugin` under `packages/shared` (see `docs/plugins.md`).
-2. Set `canInput` / `canOutput` and optional `notes` / `comingSoon`.
-3. Mirror extensions in `converter/server.py` when enabling for real converts.
-4. Rebuild shared + web.
+1. Edit `FORMATS` in `packages/shared/src/formats.ts` (`enabled()` vs `blocked()`).
+2. Mirror suffixes in `converter/server.py` `INPUT_EXT` / `OUTPUT_EXT`.
+3. Rebuild: `npm run build -w @epub/shared` (and web).
 
-Disabled plugins stay in the registry for discovery (`formatRegistry.list()`) and documentation; the capability matrix and UI only offer enabled pairs.
+See also `docs/plugins.md`.

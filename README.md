@@ -31,7 +31,8 @@ A calm, modern web app for converting ebooks and documents. Built with Vite + Re
 | **RTF**        | ✓    | ✓   | ✓    | ✓    | ✓   | ✓   | ✓    | ✓        | ✓    | —   |
 
 Same-format pairs are disabled. **Hero pair: EPUB ↔ PDF.**  
-A broader catalog (CBZ, ODT, KEPUB, …) is registered as coming-soon — see [docs/formats-catalog.md](docs/formats-catalog.md).
+Many additional engine-supported formats are enabled (KEPUB, CBZ, ODT, LIT, …).  
+CBR / PPTX / CSV and non-ebook types stay blocked — see [docs/formats-catalog.md](docs/formats-catalog.md).
 
 Notes:
 - PDF → ebook reflow quality depends on the source PDF layout.
@@ -297,8 +298,9 @@ Calibre is memory-heavy. This repo uses `instance_type = "standard-2"` (1 vCPU /
 | Doc | Topic |
 |-----|--------|
 | [docs/plugins.md](docs/plugins.md) | Add a format / preset / guard |
-| [docs/formats-catalog.md](docs/formats-catalog.md) | Enabled vs wishlist formats |
+| [docs/formats-catalog.md](docs/formats-catalog.md) | Enabled vs blocked formats |
 | [docs/high-performance.md](docs/high-performance.md) | Cold vs warm, R2 TTL, rate limits, cost |
+| [docs/domain-dev-plan.md](docs/domain-dev-plan.md) | Buy a `.dev` domain + Worker Custom Domain |
 
 ## License
 
